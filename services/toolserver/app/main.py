@@ -1,11 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import database
 import tools
+import os
 from database import get_db, init_db
+from feedback_db import FeedbackDB
 
 app = FastAPI(title="Jarvis Toolserver", version="1.0.0")
 
@@ -18,6 +20,10 @@ app.add_middleware(
 )
 
 init_db()
+
+# Initialize feedback database
+FEEDBACK_DB_PATH = os.getenv("FEEDBACK_DB_PATH", "/app/data/feedback.db")
+feedback_db = FeedbackDB(FEEDBACK_DB_PATH)
 
 class FactRequest(BaseModel):
     value: str
@@ -35,6 +41,24 @@ class SearchRequest(BaseModel):
 class DocumentRequest(BaseModel):
     text: str
     metadata: Optional[dict] = None
+
+class FeedbackRequest(BaseModel):
+    query: str
+    response: str
+    rating: int  # 1-5
+    comment: Optional[str] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
+
+class CorrectionRequest(BaseModel):
+    query: str
+    wrong_response: str
+    correct_response: str
+    context: Optional[str] = None
+
+class PreferenceRequest(BaseModel):
+    key: str
+    value: str
 
 @app.get("/")
 def root():
@@ -83,3 +107,73 @@ def add_document(request: DocumentRequest):
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+# Feedback & Learning Endpoints
+
+@app.post("/v1/feedback")
+def add_feedback(request: FeedbackRequest):
+    """Add user feedback for a conversation"""
+    feedback_id = feedback_db.add_feedback(
+        query=request.query,
+        response=request.response,
+        rating=request.rating,
+        comment=request.comment,
+        model=request.model,
+        provider=request.provider
+    )
+    return {"message": "Feedback gespeichert", "feedback_id": feedback_id}
+
+@app.post("/v1/corrections")
+def add_correction(request: CorrectionRequest):
+    """Add a user correction"""
+    correction_id = feedback_db.add_correction(
+        query=request.query,
+        wrong_response=request.wrong_response,
+        correct_response=request.correct_response,
+        context=request.context
+    )
+    return {"message": "Korrektur gespeichert", "correction_id": correction_id}
+
+@app.get("/v1/learning/context")
+def get_learning_context(limit: int = 5):
+    """Get learning context from feedback and corrections"""
+    context = feedback_db.get_learning_context("", limit)
+    return {"context": context}
+
+@app.get("/v1/learning/statistics")
+def get_learning_statistics():
+    """Get feedback statistics"""
+    stats = feedback_db.get_statistics()
+    return stats
+
+@app.get("/v1/feedback/negative")
+def get_negative_feedback(limit: int = 20):
+    """Get negative feedback for analysis"""
+    feedback = feedback_db.get_negative_feedback(limit)
+    return {"feedback": feedback}
+
+@app.get("/v1/corrections")
+def get_corrections(limit: int = 20):
+    """Get all corrections"""
+    corrections = feedback_db.get_corrections(limit)
+    return {"corrections": corrections}
+
+@app.post("/v1/preferences")
+def set_preference(request: PreferenceRequest):
+    """Set a user preference"""
+    feedback_db.set_preference(request.key, request.value)
+    return {"message": "Präferenz gespeichert"}
+
+@app.get("/v1/preferences/{key}")
+def get_preference(key: str):
+    """Get a user preference"""
+    value = feedback_db.get_preference(key)
+    if value is None:
+        raise HTTPException(status_code=404, detail=f"Preference '{key}' not found")
+    return {"key": key, "value": value}
+
+@app.get("/v1/preferences")
+def get_all_preferences():
+    """Get all user preferences"""
+    preferences = feedback_db.get_all_preferences()
+    return {"preferences": preferences}

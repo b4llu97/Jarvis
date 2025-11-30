@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Mic, Send, Loader2, Volume2, Database } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Mic, Send, Loader2, Volume2, Database, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -10,10 +10,15 @@ import { sendTextQuery, transcribeAudio, synthesizeSpeech, Message } from './ser
 import { useAudioRecorder } from './hooks/useAudioRecorder';
 import { FactsManager } from './components/FactsManager';
 import { ToolCallsDisplay } from './components/ToolCallsDisplay';
+import { FeedbackButtons } from './components/FeedbackButtons';
+import { LearningDashboard } from './components/LearningDashboard';
 
 interface MessageWithTools extends Message {
   toolCalls?: Array<{ tool: string; args: Record<string, unknown> }>;
   toolResults?: Array<{ tool: string; result: unknown }>;
+  model?: string;
+  provider?: string;
+  query?: string;
 }
 
 function App() {
@@ -55,7 +60,10 @@ function App() {
         role: 'assistant', 
         content: response.response,
         toolCalls: response.tool_calls,
-        toolResults: response.tool_results
+        toolResults: response.tool_results,
+        model: (response as any).llm_metadata?.model,
+        provider: (response as any).llm_metadata?.provider,
+        query: text
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
@@ -148,6 +156,10 @@ function App() {
               <Database className="w-4 h-4 mr-2" />
               Fakten
             </TabsTrigger>
+            <TabsTrigger value="learning" className="data-[state=active]:bg-blue-600">
+              <Brain className="w-4 h-4 mr-2" />
+              Lernen
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="chat" className="flex-1 overflow-hidden flex flex-col mt-0">
@@ -183,10 +195,18 @@ function App() {
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                       </Card>
                       {message.role === 'assistant' && (
-                        <ToolCallsDisplay 
-                          toolCalls={message.toolCalls} 
-                          toolResults={message.toolResults}
-                        />
+                        <>
+                          <ToolCallsDisplay 
+                            toolCalls={message.toolCalls} 
+                            toolResults={message.toolResults}
+                          />
+                          <FeedbackButtons
+                            query={message.query || ''}
+                            response={message.content}
+                            model={message.model}
+                            provider={message.provider}
+                          />
+                        </>
                       )}
                     </div>
                   </div>
@@ -266,6 +286,10 @@ function App() {
 
           <TabsContent value="facts" className="flex-1 overflow-y-auto mt-0">
             <FactsManager />
+          </TabsContent>
+
+          <TabsContent value="learning" className="flex-1 overflow-y-auto mt-0">
+            <LearningDashboard />
           </TabsContent>
         </Tabs>
       </div>
