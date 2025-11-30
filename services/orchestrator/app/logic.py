@@ -208,6 +208,17 @@ def execute_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def get_learning_context() -> str:
+    """Get learning context from feedback database"""
+    try:
+        response = requests.get(f"{TOOLSERVER_URL}/v1/learning/context?limit=5", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("context", "")
+    except Exception as e:
+        print(f"Error fetching learning context: {e}")
+    return ""
+
 def process_query(
     query: str,
     conversation_history: Optional[List[Dict[str, str]]] = None
@@ -220,7 +231,14 @@ def process_query(
         for tool in tools
     ])
     
+    # Get learning context from feedback
+    learning_context = get_learning_context()
+    
+    # Build full system prompt with learning context
     full_system_prompt = f"{system_prompt}\n\n{persona_prompt}\n\nVerfügbare Tools:\n{tools_description}"
+    
+    if learning_context:
+        full_system_prompt += f"\n\n{learning_context}\n\nBitte berücksichtige diese früheren Korrekturen und Feedback bei deiner Antwort."
     
     messages = [{"role": "system", "content": full_system_prompt}]
     

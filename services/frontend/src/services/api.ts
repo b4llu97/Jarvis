@@ -132,3 +132,67 @@ export async function deleteFact(key: string): Promise<void> {
     throw new Error(`Toolserver error: ${response.statusText}`);
   }
 }
+
+// Feedback & Learning API
+
+export interface FeedbackRequest {
+  query: string;
+  response: string;
+  rating: number;
+  comment?: string;
+  model?: string;
+  provider?: string;
+}
+
+export interface CorrectionRequest {
+  query: string;
+  wrong_response: string;
+  correct_response: string;
+  context?: string;
+}
+
+export interface LearningStatistics {
+  total_feedback: number;
+  average_rating: number;
+  rating_distribution: Record<number, number>;
+  total_corrections: number;
+  recent_feedback_7d: number;
+}
+
+export async function submitFeedback(feedback: FeedbackRequest): Promise<void> {
+  const response = await fetch(`${TOOLSERVER_URL}/v1/feedback`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(feedback),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Feedback submission error: ${response.statusText}`);
+  }
+}
+
+export async function submitCorrection(correction: CorrectionRequest): Promise<void> {
+  const response = await fetch(`${TOOLSERVER_URL}/v1/corrections`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(correction),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Correction submission error: ${response.statusText}`);
+  }
+}
+
+export async function getLearningStatistics(): Promise<LearningStatistics> {
+  const response = await fetch(`${TOOLSERVER_URL}/v1/learning/statistics`);
+
+  if (!response.ok) {
+    throw new Error(`Statistics error: ${response.statusText}`);
+  }
+
+  return response.json();
+}
