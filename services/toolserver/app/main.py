@@ -60,6 +60,15 @@ class PreferenceRequest(BaseModel):
     key: str
     value: str
 
+
+class SmartHomeListDevicesRequest(BaseModel):
+    domain: str
+
+
+class SmartHomeEntityRequest(BaseModel):
+    entity_id: str
+
+
 @app.get("/")
 def root():
     return {"service": "Jarvis Toolserver", "status": "running"}
@@ -177,3 +186,31 @@ def get_all_preferences():
     """Get all user preferences"""
     preferences = feedback_db.get_all_preferences()
     return {"preferences": preferences}
+
+
+@app.post("/v1/smarthome/list_devices")
+def smarthome_list_devices(request: SmartHomeListDevicesRequest):
+    """List all Smart Home devices of a specific type"""
+    result = tools.smarthome_list_devices(request.domain)
+    return result
+
+
+@app.post("/v1/smarthome/turn_on")
+def smarthome_turn_on(request: SmartHomeEntityRequest):
+    """Turn on a Smart Home device"""
+    result = tools.smarthome_turn_on(request.entity_id)
+    return result
+
+
+@app.post("/v1/smarthome/turn_off")
+def smarthome_turn_off(request: SmartHomeEntityRequest):
+    """Turn off a Smart Home device"""
+    result = tools.smarthome_turn_off(request.entity_id)
+    return result
+
+
+@app.post("/v1/smarthome/get_status")
+def smarthome_get_status(request: SmartHomeEntityRequest):
+    """Get the status of a Smart Home device or sensor"""
+    result = tools.smarthome_get_status(request.entity_id)
+    return result

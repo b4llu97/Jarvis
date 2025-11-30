@@ -147,6 +147,38 @@ def parse_tool_calls(text: str) -> List[Dict[str, Any]]:
                     "function": "search_docs",
                     "query": query_match.group(1)
                 })
+        
+        elif match.startswith("smarthome_list_devices("):
+            domain_match = re.search(r'smarthome_list_devices\(["\'](.+?)["\']\)', match)
+            if domain_match:
+                tool_calls.append({
+                    "function": "smarthome_list_devices",
+                    "domain": domain_match.group(1)
+                })
+        
+        elif match.startswith("smarthome_turn_on("):
+            entity_match = re.search(r'smarthome_turn_on\(["\'](.+?)["\']\)', match)
+            if entity_match:
+                tool_calls.append({
+                    "function": "smarthome_turn_on",
+                    "entity_id": entity_match.group(1)
+                })
+        
+        elif match.startswith("smarthome_turn_off("):
+            entity_match = re.search(r'smarthome_turn_off\(["\'](.+?)["\']\)', match)
+            if entity_match:
+                tool_calls.append({
+                    "function": "smarthome_turn_off",
+                    "entity_id": entity_match.group(1)
+                })
+        
+        elif match.startswith("smarthome_get_status("):
+            entity_match = re.search(r'smarthome_get_status\(["\'](.+?)["\']\)', match)
+            if entity_match:
+                tool_calls.append({
+                    "function": "smarthome_get_status",
+                    "entity_id": entity_match.group(1)
+                })
     
     return tool_calls
 
@@ -201,6 +233,76 @@ def execute_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
                 }
             else:
                 return {"success": True, "result": "Keine Dokumente gefunden"}
+        
+        elif function == "smarthome_list_devices":
+            domain = tool_call.get("domain")
+            response = requests.post(
+                f"{TOOLSERVER_URL}/v1/smarthome/list_devices",
+                json={"domain": domain},
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get("success"):
+                devices = data.get("devices", [])
+                if devices:
+                    device_list = []
+                    for device in devices:
+                        device_list.append(
+                            f"- {device.get('friendly_name', device.get('entity_id'))}: "
+                            f"{device.get('entity_id')} ({device.get('state', 'unknown')})"
+                        )
+                    return {"success": True, "result": "\n".join(device_list)}
+                else:
+                    return {"success": True, "result": f"Keine {domain}-Geräte gefunden"}
+            else:
+                return {"success": False, "error": data.get("error", "Unbekannter Fehler")}
+        
+        elif function == "smarthome_turn_on":
+            entity_id = tool_call.get("entity_id")
+            response = requests.post(
+                f"{TOOLSERVER_URL}/v1/smarthome/turn_on",
+                json={"entity_id": entity_id},
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get("success"):
+                return {"success": True, "result": data.get("message", f"{entity_id} eingeschaltet")}
+            else:
+                return {"success": False, "error": data.get("error", "Fehler beim Einschalten")}
+        
+        elif function == "smarthome_turn_off":
+            entity_id = tool_call.get("entity_id")
+            response = requests.post(
+                f"{TOOLSERVER_URL}/v1/smarthome/turn_off",
+                json={"entity_id": entity_id},
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get("success"):
+                return {"success": True, "result": data.get("message", f"{entity_id} ausgeschaltet")}
+            else:
+                return {"success": False, "error": data.get("error", "Fehler beim Ausschalten")}
+        
+        elif function == "smarthome_get_status":
+            entity_id = tool_call.get("entity_id")
+            response = requests.post(
+                f"{TOOLSERVER_URL}/v1/smarthome/get_status",
+                json={"entity_id": entity_id},
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get("success"):
+                return {"success": True, "result": data.get("status_text", f"{entity_id}: {data.get('state', 'unknown')}")}
+            else:
+                return {"success": False, "error": data.get("error", "Fehler beim Abrufen des Status")}
         
         else:
             return {"success": False, "error": f"Unbekannte Funktion: {function}"}

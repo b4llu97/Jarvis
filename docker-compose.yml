@@ -39,10 +39,12 @@ services:
       - FACTS_DB_PATH=/app/data/facts.db
       - CHROMA_HOST=http://chroma:8000
       - CHROMA_COLLECTION=jarvis_docs
+      - SMARTHOME_URL=http://smarthome:8008
     env_file:
       - ./config/.env
     depends_on:
       - chroma
+      - smarthome
     networks:
       - jarvis-network
     restart: unless-stopped
@@ -161,6 +163,24 @@ services:
       - ./config/.env
     depends_on:
       - toolserver
+    networks:
+      - jarvis-network
+    restart: unless-stopped
+
+  smarthome:
+    build:
+      context: ./services/smarthome
+      dockerfile: Dockerfile
+    container_name: jarvis-smarthome
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./config:/app/config:ro
+    environment:
+      - HOME_ASSISTANT_URL=${HOME_ASSISTANT_URL:-http://homeassistant.local:8123}
+      - HOME_ASSISTANT_TOKEN=${HOME_ASSISTANT_TOKEN:-}
+    env_file:
+      - ./config/.env
     networks:
       - jarvis-network
     restart: unless-stopped
